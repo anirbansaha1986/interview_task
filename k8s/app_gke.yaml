@@ -1,0 +1,86 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: book-recommender-model
+  namespace: datasentics
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: book-recommender
+  template:
+    metadata:
+      labels:
+        app: book-recommender
+        name: book-recommender-model
+    spec:
+      containers:
+      - name: book-recommender
+        image: gcr.io/datasentics-project/recommender:0.11
+        imagePullPolicy: IfNotPresent
+        resources:
+          limits:
+            memory: "512Mi"
+            cpu: "00m"
+        ports:
+        - containerPort: 8008
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: book-recommender-svc
+  namespace: datasentics
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 8008
+  selector:
+    app: book-recommender
+    name: book-recommender-model
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: books-db
+  namespace: datasentics
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: datasentics
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mysql
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - image: mysql:5.6
+        name: mysql
+        env:
+          # Use secret in real usage
+        - name: MYSQL_ROOT_PASSWORD
+          value: password
+        ports:
+        - containerPort: 3306
+          name: mysql
+        volumeMounts:
+        - name: mysql-persistent-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-persistent-storage
+        persistentVolumeClaim:
+          claimName: mysql-pv-claim
